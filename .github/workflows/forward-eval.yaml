@@ -26,12 +26,19 @@ jobs:
           echo "$CLIENT_PAYLOAD" | jq '.' || echo "Failed to parse client payload as JSON"
           
           # Forward the dispatch to the private evaluations-internal repo
+          REPO_OWNER="${{ vars.PRIVATE_REPO_OWNER || 'browser-use' }}"
+          TARGET_REPO="evaluations-internal"
+          TARGET_URL="https://api.github.com/repos/${REPO_OWNER}/${TARGET_REPO}/dispatches"
+          
+          echo "🎯 Target repository: ${REPO_OWNER}/${TARGET_REPO}"
+          echo "🔗 Target URL: ${TARGET_URL}"
+          
           curl -X POST \
             -H "Authorization: Bearer ${{ secrets.PRIVATE_REPO_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
             -H "Content-Type: application/json" \
             -H "User-Agent: evaluation-endpoint-forwarder/1.0" \
-            https://api.github.com/repos/${{ vars.PRIVATE_REPO_OWNER || 'your-org' }}/evaluations-internal/dispatches \
+            "${TARGET_URL}" \
             -d "{
               \"event_type\": \"run-eval\",
               \"client_payload\": $CLIENT_PAYLOAD
