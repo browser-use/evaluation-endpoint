@@ -11,7 +11,7 @@ jobs:
     timeout-minutes: 5
     
     steps:
-      - name: Authenticate and forward dispatch to private repo
+      - name: Forward dispatch to private repo
         run: |
           echo "=== FORWARDING EVALUATION DISPATCH ==="
           echo "Event type: ${{ github.event.action }}"
@@ -19,34 +19,11 @@ jobs:
           echo "Forwarding to: evaluations-internal"
           echo "====================================="
           
-          # Extract client payload
+          # Extract client payload and forward it directly
           CLIENT_PAYLOAD='${{ toJson(github.event.client_payload) }}'
           
-          echo "Client payload received (security check in progress...):"
-          
-          # Security Check: Verify the secret key
-          RECEIVED_SECRET=$(echo "$CLIENT_PAYLOAD" | jq -r '.secret_key // empty')
-          EXPECTED_SECRET="${{ secrets.EVALUATION_ENDPOINT_SECRET }}"
-          
-          if [ -z "$RECEIVED_SECRET" ]; then
-            echo "❌ SECURITY: No secret key provided in client payload"
-            echo "❌ AUTHORIZATION FAILED: Request rejected"
-            exit 1
-          fi
-          
-          if [ "$RECEIVED_SECRET" != "$EXPECTED_SECRET" ]; then
-            echo "❌ SECURITY: Invalid secret key provided"
-            echo "❌ AUTHORIZATION FAILED: Request rejected"
-            exit 1
-          fi
-          
-          echo "✅ SECURITY: Secret key verified successfully"
-          
-          # Remove the secret key from payload before forwarding (security best practice)
-          CLEAN_PAYLOAD=$(echo "$CLIENT_PAYLOAD" | jq 'del(.secret_key)')
-          
-          echo "Cleaned payload (secret removed):"
-          echo "$CLEAN_PAYLOAD" | jq '.' || echo "Failed to parse cleaned payload as JSON"
+          echo "Client payload received:"
+          echo "$CLIENT_PAYLOAD" | jq '.' || echo "Failed to parse client payload as JSON"
           
           # Forward the dispatch to the private evaluations-internal repo
           curl -X POST \
@@ -57,7 +34,7 @@ jobs:
             https://api.github.com/repos/${{ vars.PRIVATE_REPO_OWNER || 'your-org' }}/evaluations-internal/dispatches \
             -d "{
               \"event_type\": \"run-eval\",
-              \"client_payload\": $CLEAN_PAYLOAD
+              \"client_payload\": $CLIENT_PAYLOAD
             }" \
             --max-time 30 \
             --retry 3 \
